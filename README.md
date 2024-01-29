@@ -1,0 +1,1 @@
+# TC-calidad-imagen
