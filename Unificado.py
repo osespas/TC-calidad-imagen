@@ -37,6 +37,9 @@ from openpyxl.utils import get_column_letter
 from openpyxl.styles.colors import Color
 import tkinter as tk
 from tkinter import filedialog
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
 
 
 #######################################
@@ -606,35 +609,32 @@ def Contraste(head_params, dcm_files):
 
 def plot_linearity(roi_value, std_value, roi_settings):
     
-    plt.figure(figsize=(12, 8))
-    plt.ylim(-1500, 1500)
-    plt.xlim(0,0.4)
-    plt.xlabel('Atenuacion ($\mu = cm^{-1}$)')
-    plt.ylabel('UH')    
-    plt.title("Linealidad Contraste")
-    t = np.linspace(0,600,50)
-            
-    mu = {}
-    for roi in roi_settings.keys(): 
-        plt.scatter(roi_settings[roi]['mu'],roi_value[roi], label = roi , color = roi_settings[roi]["color"], marker = 'x')
-        mu[roi] = roi_settings[roi]['mu']
-        #plt.errorbar(roi_settings[roi]['mu'], roi_value[roi], yerr= std_dict[roi] )
-
-
-    slope, intercept, r, p, se = stats.linregress(list(mu.values()), list(roi_value.values()))
-    print( f"R-squared: {r**2:.6f}")
-    plt.plot(t, intercept + slope*t, 'red', label='Ajuste')
-    plt.legend() 
-    #textstr = f'{r**2}'
-    #fig.text(0.30, 0.90, textstr, transform=axs[1,1].transAxes, fontsize=18,
-    #verticalalignment='top', bbox=props)ç props = dict(boxstyle='round', facecolor='wheat', alpha=0.2)
-    results = ['Escala de Contraste = %.6f UH/$\mathrm{cm}^{-1}$' %(1/slope)]
-    #results = ['f (MTF = %i%%) = %.2f $\mathrm{cm}^{-1}$' %(50,mtfp_vals[k][0.5])]
-    textstr = '\n'.join(results)
-    plt.text(0.25, 0.55, textstr, fontsize = 'large')
-    plt.savefig('linealidad_contraste.png')
-    plt.show()
+    fig = Figure(figsize=(12, 8))
     
+    ax = fig.add_subplot(111)
+    ax.set_ylim(-1500, 1500)
+    ax.set_xlim(0, 0.4)
+    ax.set_xlabel('Atenuación ($\mu = cm^{-1}$)')
+    ax.set_ylabel('UH')
+    ax.set_title("Linealidad Contraste")
+
+    t = np.linspace(0, 600, 50)
+    mu = {}
+    
+    for roi in roi_settings.keys():
+        ax.scatter(roi_settings[roi]['mu'], roi_value[roi], label=roi, color=roi_settings[roi]["color"], marker='x')
+        mu[roi] = roi_settings[roi]['mu']
+    
+    slope, intercept, r, p, se = stats.linregress(list(mu.values()), list(roi_value.values()))
+    ax.plot(t, intercept + slope * t, 'red', label='Ajuste')
+    ax.legend()
+    
+    results = ['Escala de Contraste = %.6f UH/$\mathrm{cm}^{-1}$' % (1/slope)]
+    textstr = '\n'.join(results)
+    ax.text(0.25, 0.55, textstr, fontsize='large')
+
+    return fig
+
     
 def create_xlsx2(roi_value, roi_settings, dcm_files):
     
@@ -775,11 +775,22 @@ def procesar_contraste():
                 dcm_files.append(os.path.join(path, file_name))
                 print(' INFO **MAIN()** CARGANDO IMAGEN: ', file_name)
         except:
-            pass
+                pass
         
+    ##########################
+
     roi_dict, std_dict, roi_settings = Contraste(head_params, dcm_files)
-    plot_linearity(roi_dict, std_dict, roi_settings) 
-    create_xlsx2(roi_dict, dcm_files)
+    fig = plot_linearity(roi_dict, std_dict, roi_settings)
+    create_xlsx2(roi_dict, roi_settings, dcm_files)
+
+    # Si ya existe un canvas, primero lo eliminas
+    for widget in grafico_frame.winfo_children():
+        widget.destroy()
+    
+    canvas = FigureCanvasTkAgg(fig, master=grafico_frame)
+    canvas.draw()
+    canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+
 
 
 def seleccionar_carpeta():
@@ -812,6 +823,10 @@ tk.Button(app, text="Procesar Contraste", command=procesar_contraste).grid(row=4
 # Área de Mensajes
 area_mensajes = tk.Text(app, height=10, width=50)
 area_mensajes.grid(row=5, column=0, columnspan=2)
+
+# Contenedor para el gráfico
+grafico_frame = tk.Frame(app)
+grafico_frame.grid(row=6, column=0, columnspan=2)
 
 app.mainloop()
         
