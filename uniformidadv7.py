@@ -27,6 +27,9 @@ from openpyxl.worksheet.table import Table, TableStyleInfo
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.styles.colors import Color
+import tkinter as tk
+from tkinter import filedialog
+
 
 
 def analyze(edges):
@@ -259,23 +262,7 @@ def Uniformity(dcm_files):
         #pixel_data_copy = Slope*pixel_data_copy+Intercept
         #print(pixel_data_copy.max(), pixel_data.max())
         
-       
-        if args.debug == True:
-            print(" DEBUG **Uniformity()** Hospital:", Hospital)
-            print(" DEBUG **Uniformity()** Parte del cuerpo:", ParteDelCuerpo)
-            print(" DEBUG **Uniformity()** Equipo:", Equipo)
-            print(" DEBUG **Uniformity()** Tamaño de corte:", TamanoCorte)
-            print(" DEBUG **Uniformity()** KV:", KV)
-            print(" DEBUG **Uniformity()** mAs:", mAs)
-            print(" DEBUG **Uniformity()** Kernel:", Kernel)
-            #print(" DEBUG **Uniformity()** Tiempo de Revolución:", TiempoRev)
-            print(" DEBUG **Uniformity()** Tamaño de Pixel en la x:", tamPx)
-            print(" DEBUG **Uniformity()** Tamaño de Pixel en la y:", tamPy)
-            print(" DEBUG **Uniformity()** Número de Pixels por fila:", NumPixelsRows)
-            print(" DEBUG **Uniformity()** Número de Pixels por columna:", NumPixelsCols)
-            print(" DEBUG **Uniformity()** HU = a*pixel + b; slope = :", Slope )
-            print(" DEBUG **Uniformity()** HU = a*pixel + b; intercept = ", Intercept)
-        
+   
         #Protocolo Español: radio de 1 cm
         radius = int(10/tamPx) #en pixeles
         radiusy = int(10/tamPy) #en pixeles
@@ -365,8 +352,8 @@ def Uniformity(dcm_files):
             roi_value[roi] = np.round(props['intensity_mean'][0]*Slope + Intercept,2)
             std_value[roi] = np.round(np.std(std),2)
             #print(np.mean(circle[roi]))
-            if args.debug== True: print(f' DEBUG **Uniformity()** {roi} ROI Value: ', roi_value[roi])
-            if args.debug== True: print(f' DEBUG **Uniformity()** {roi} ROI Std. Value: ', std_value[roi])
+            print(f' DEBUG **Uniformity()** {roi} ROI Value: ', roi_value[roi])
+            print(f' DEBUG **Uniformity()** {roi} ROI Std. Value: ', std_value[roi])
            
 
         
@@ -399,7 +386,7 @@ def Uniformity(dcm_files):
         return roi_value, std_value, diffs
     
 
-def Ruido(dcm_files):
+def Ruido(std_threshold, dcm_files):
    
     imagenes = dcm_files
     num_imagenes = len(imagenes)
@@ -453,23 +440,7 @@ def Ruido(dcm_files):
         Slope = imagen.RescaleSlope
         #pixel_data_copy = Slope*pixel_data_copy+Intercept
         #print(pixel_data_copy.max(), pixel_data.max())
-        
-       
-        if args.debug == True:
-            print(" DEBUG **Ruido()** Hospital:", Hospital)
-            print(" DEBUG **Ruido()** Parte del cuerpo:", ParteDelCuerpo)
-            print(" DEBUG **Ruido()** Equipo:", Equipo)
-            print(" DEBUG **Ruido()** Tamaño de corte:", TamanoCorte)
-            print(" DEBUG **Ruido()** KV:", KV)
-            print(" DEBUG **Ruido()** mAs:", mAs)
-            print(" DEBUG **Ruido()** Kernel:", Kernel)
-            #print(" DEBUG **Ruido()** Tiempo de Revolución:", TiempoRev)
-            print(" DEBUG **Ruido()** Tamaño de Pixel en la x:", tamPx)
-            print(" DEBUG **Ruido()** Tamaño de Pixel en la y:", tamPy)
-            print(" DEBUG **Ruido()** Número de Pixels por fila:", NumPixelsRows)
-            print(" DEBUG **Ruido()** Número de Pixels por columna:", NumPixelsCols)
-            print(" DEBUG **Ruido()** HU = a*pixel + b; slope = :", Slope )
-            print(" DEBUG **Ruido()** HU = a*pixel + b; intercept = ", Intercept)
+
         
         #Protocolo Español: radio de 1 cm
         radius = int(np.sqrt((500/tamPx**2)/np.pi)) #en pixeles
@@ -542,8 +513,8 @@ def Ruido(dcm_files):
             roi_value[roi] = np.round(props['intensity_mean'][0]*Slope + Intercept,2)
             std_value[roi] = np.round(np.std(std),2)
             #print(np.mean(circle[roi]))
-            if args.debug== True: print(f' DEBUG **Ruido()** {roi} ROI Value: ', roi_value[roi])
-            if args.debug== True: print(f' DEBUG **Ruido()** {roi} ROI Std. Value: ', std_value[roi])
+            print(f' DEBUG **Ruido()** {roi} ROI Value: ', roi_value[roi])
+            print(f' DEBUG **Ruido()** {roi} ROI Std. Value: ', std_value[roi])
                         
             if std_value[roi] < std_threshold:
                 print(f' INFO **Ruido()** IN TOLERANCE ')
@@ -553,27 +524,19 @@ def Ruido(dcm_files):
 
         
             
-        return roi_value, std_value, std_threshold
+        return roi_value, std_value
             
         
-        
+def procesar_imagenes():
+    path = ruta_texto.get()
+    anatomia = seleccion_anatomia.get()
 
-
-if __name__ == "__main__":
+    head_params = anatomia
     
-    parser = argparse.ArgumentParser()
-    #//canteras2/compartido Radio Fisica Nivel 2/Residentes/Oscar/Ejercicios/03 Uniformidad/imagenes/
-    #//canteras2/compartido Fisica Medica Nivel 4/02 Radiodiagnóstico/Informes de control de calidad/Carpeta doble verificación/2023/Oscar/TAC1/SOMATOM/Torax Br40/UNIFORMIDAD'
-    parser.add_argument('--path', help= 'path to file', default = '//canteras2/compartido Fisica Medica Nivel 4/02 Radiodiagnóstico/Informes de control de calidad/Carpeta doble verificación/2023/Oscar/TAC1/SOMATOM/Cabeza Hr40/UNIFORMIDAD')
-    #parser.add_argument('--path', help= 'path to file', default = '//canteras2/compartido Radio Fisica Nivel 2/Residentes/Oscar/Ejercicios/03 Uniformidad/imagenes/FV/')
-    parser.add_argument('--debug', help= 'true or false', default = True)
-    parser.add_argument('--anatomy', help= 'Head or Torax', default = 'Head')
-    args = parser.parse_args()
-    path = args.path # to change directory to argument passed for '--path'
-    debug = args.debug
-    anatomy = args.anatomy
     os.chdir(path)
     dcm_files = []
+    
+    
     for file_name in os.listdir(path):
         try:
             if file_name.endswith(".DCM"):
@@ -585,12 +548,47 @@ if __name__ == "__main__":
         except:
             pass
     
-    if args.anatomy == 'Head': std_threshold = 5
-    elif args.anatomy == 'Torax': std_threshold = 20 
+
+    std_threshold = 0
+    if head_params == 'Head': std_threshold = 5
+    elif head_params == 'Torax': std_threshold = 20 
     
     roi_value, std_value, diffs = Uniformity(dcm_files)
-    roi_value_ruido, std_value_ruido, std_threshold = Ruido(dcm_files)
+    roi_value_ruido, std_value_ruido= Ruido(std_threshold, dcm_files)
     create_xlsx(roi_value, std_value, std_threshold, diffs, dcm_files)
     create_xlsx_ruido(std_value_ruido, std_threshold, dcm_files)
+
+    # Por ahora, solo imprimiremos los valores seleccionados
+    area_mensajes.insert(tk.END, f"Procesando imágenes en {path} para {anatomia}\n")
+
+def seleccionar_carpeta():
+    path = filedialog.askdirectory()
+    ruta_texto.set(path)
+    
+    
+app = tk.Tk()
+app.title("Procesador de Imágenes DICOM")
+
+# Ruta de los archivos DICOM
+tk.Label(app, text="Ruta de los Archivos DICOM:").pack()
+ruta_texto = tk.StringVar()
+ruta_entrada = tk.Entry(app, textvariable=ruta_texto, width=50)
+ruta_entrada.pack()
+tk.Button(app, text="Seleccionar Carpeta", command=seleccionar_carpeta).pack()
+
+# Selección de Anatomía
+seleccion_anatomia = tk.StringVar(value='Head')
+tk.Radiobutton(app, text="Head", variable=seleccion_anatomia, value='Head').pack()
+tk.Radiobutton(app, text="Torax", variable=seleccion_anatomia, value='Torax').pack()
+
+# Botón para procesar imágenes
+tk.Button(app, text="Procesar Imágenes", command=procesar_imagenes).pack()
+
+# Área de Mensajes
+area_mensajes = tk.Text(app, height=10, width=50)
+area_mensajes.pack()
+
+app.mainloop()
+
 
      
