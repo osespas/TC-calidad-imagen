@@ -755,6 +755,7 @@ def procesar_resolucion():
 
     # Por ahora, solo imprimiremos los valores seleccionados
     area_mensajes.insert(tk.END, f"Procesando imágenes en {path} para {anatomia}\n")
+    area_mensajes.insert(tk.END, lpcm)
 
 def procesar_contraste():
     path = ruta_texto.get()
@@ -798,14 +799,69 @@ def seleccionar_carpeta():
     ruta_texto.set(path)
 
 
+def exportar_a_excel():
+    #De momento solo lo hace con la resolucion y de forma muy burda, porque repite todo el analisis.
+    #Necesitamos pensar como hacer esto mejor
+    path = ruta_texto.get()
+    anatomia = seleccion_anatomia.get()
+    head_params = anatomia == 'Head'
+    
+ 
+    
+    os.chdir(path)
+    dcm_files = []
+    
+    
+    for file_name in os.listdir(path):
+        try:
+            if file_name.endswith(".DCM"):
+                dcm_files.append(os.path.join(path, file_name))
+                print(' INFO **MAIN()** CARGANDO IMAGEN: ', file_name)
+            elif file_name.endswith(".dcm"):
+                dcm_files.append(os.path.join(path, file_name))
+                print(' INFO **MAIN()** CARGANDO IMAGEN: ', file_name)
+        except:
+                pass
+        
+    ##########################
+    
+    contraste = Resolucion(head_params, dcm_files)
+    contraste.insert(0, "Contraste (%)")
+    lpcm = ["lp/cm", 0, 1 , 2, 3, 4, 5, 6, 7, 8]
+    try:
+        wb = load_workbook("historico.xlsx")
+    except FileNotFoundError:
+        wb = Workbook()
 
+    ws = wb.active
+   
+    
+    row = 1    
+    for i, value in enumerate(lpcm, start=1):
+        ws.cell(row=row, column=i, value=value)
+
+    # Encontrar la primera fila vacía en la columna A
+    row = 2
+    while ws.cell(row=row, column=1).value is not None:
+        row += 1
+
+    for i, value in enumerate(contraste, start=1):
+        ws.cell(row=row, column=i, value=value)
+
+    wb.save("historico.xlsx")
+         
+    
+#####################################################################            
+######################APP GUI #######################################
+#####################################################################
+           
 app = tk.Tk()
 app.title("Procesador de Imágenes DICOM")
 
 # Ruta de los archivos DICOM
 tk.Label(app, text="Ruta de los Archivos DICOM:").grid(row=0, column=0, columnspan=2)
 ruta_texto = tk.StringVar()
-ruta_entrada = tk.Entry(app, textvariable=ruta_texto, width=50)
+ruta_entrada = tk.Entry(app, textvariable=ruta_texto, width=100)
 ruta_entrada.grid(row=1, column=0, columnspan=2)
 tk.Button(app, text="Seleccionar Carpeta", command=seleccionar_carpeta).grid(row=2, column=0, columnspan=2)
 
@@ -817,11 +873,14 @@ tk.Radiobutton(app, text="Torax", variable=seleccion_anatomia, value='Torax').gr
 # Botón para procesar imágenes para Resolución
 tk.Button(app, text="Procesar Resolución", command=procesar_resolucion).grid(row=4, column=0)
 
+#Botón para exportar a Excel histórico
+tk.Button(app, text="Exportar", command=exportar_a_excel).grid(row=4, column=3)
+
 # Botón para procesar imágenes para Contraste
 tk.Button(app, text="Procesar Contraste", command=procesar_contraste).grid(row=4, column=1)
 
 # Área de Mensajes
-area_mensajes = tk.Text(app, height=10, width=50)
+area_mensajes = tk.Text(app, height=10, width=100)
 area_mensajes.grid(row=5, column=0, columnspan=2)
 
 # Contenedor para el gráfico
