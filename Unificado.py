@@ -778,6 +778,7 @@ def procesar_resolucion():
 
 #6-2-2024
     update_treeview(treeview, contraste)
+    treeview.grid(row=7, column=0, columnspan=2, sticky='nsew')
 #6-2-2024
 
     # Imprimiremos los valores seleccionados
@@ -921,7 +922,7 @@ treeview = ttk.Treeview(app, columns=columns, show='headings')
 for col in columns:
     treeview.heading(col, text=col)
     treeview.column(col, anchor="center")
-treeview.grid(row=7, column=0, columnspan=2, sticky='nsew')
+
 #6-2-2024
 
 app.mainloop()
