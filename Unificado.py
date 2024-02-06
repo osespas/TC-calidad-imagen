@@ -9,7 +9,7 @@ Created on Thu Dec 21 18:15:06 2023
 """
 Created on Tue Nov 21 13:22:08 2023
 
-@author: oestpas
+@author: madiamarf
 """
 
 import os, sys, argparse, copy
@@ -37,6 +37,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.styles.colors import Color
 import tkinter as tk
 from tkinter import filedialog
+from tkinter import ttk
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
@@ -151,6 +152,22 @@ def create_xlsx(contrast_percentage, dcm_files):
     ws.add_table(tab)
     
     wb.save("table_resolucion.xlsx")
+    
+    
+        #6-2-2024
+def update_treeview(treeview, contrast_percentage):
+    # Limpia el Treeview
+    for i in treeview.get_children():
+        treeview.delete(i)
+    
+    # Datos de ejemplo, reemplaza con los valores reales
+    lp_cm = range(len(contrast_percentage))
+    estados = ["Correcto" if val >= 10 else "Incorrecto" for val in contrast_percentage]
+    
+    # Inserta los datos en el Treeview
+    for i in lp_cm:
+        treeview.insert('', 'end', values=(i, contrast_percentage[i], estados[i]))
+        #6-2-2024
 
 
 def Resolucion(head_params, dcm_files):
@@ -729,6 +746,12 @@ def create_xlsx2(roi_value, roi_settings, dcm_files):
     
 
 def procesar_resolucion():
+    
+    # Limpia el área de mensajes y el Treeview si ya contiene datos
+    area_mensajes.delete('1.0', tk.END)
+    for i in treeview.get_children():
+        treeview.delete(i)
+        
     path = ruta_texto.get()
     anatomia = seleccion_anatomia.get()
     head_params = anatomia == 'Head'
@@ -753,9 +776,13 @@ def procesar_resolucion():
     contraste = Resolucion(head_params, dcm_files)
     create_xlsx(contraste, dcm_files)
 
-    # Por ahora, solo imprimiremos los valores seleccionados
+#6-2-2024
+    update_treeview(treeview, contraste)
+#6-2-2024
+
+    # Imprimiremos los valores seleccionados
     area_mensajes.insert(tk.END, f"Procesando imágenes en {path} para {anatomia}\n")
-    area_mensajes.insert(tk.END, lpcm)
+
 
 def procesar_contraste():
     path = ruta_texto.get()
@@ -886,6 +913,16 @@ area_mensajes.grid(row=5, column=0, columnspan=2)
 # Contenedor para el gráfico
 grafico_frame = tk.Frame(app)
 grafico_frame.grid(row=6, column=0, columnspan=2)
+
+#6-2-2024
+# Define el Treeview en GUI
+columns = ("lp/cm", "Contraste (%)", "Estado")
+treeview = ttk.Treeview(app, columns=columns, show='headings')
+for col in columns:
+    treeview.heading(col, text=col)
+    treeview.column(col, anchor="center")
+treeview.grid(row=7, column=0, columnspan=2, sticky='nsew')
+#6-2-2024
 
 app.mainloop()
         
