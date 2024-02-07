@@ -168,6 +168,20 @@ def update_treeview(treeview, contrast_percentage):
     for i in lp_cm:
         treeview.insert('', 'end', values=(i, contrast_percentage[i], estados[i]))
         #6-2-2024
+        
+def update_treeview_contrast(treeview, roi_dict, std_dict, roi_settings):
+    # Limpia el Treeview
+    for i in treeview.get_children():
+        treeview.delete(i)
+    
+    # Inserta los nuevos datos en el Treeview
+    for material, values in roi_dict.items():
+        theoretical_range = roi_settings[material]['theo']
+        theoretical_value = roi_settings[material]['ref']
+        measured_value = roi_dict[material]
+        difference = measured_value - theoretical_value
+        status = "Correcto" if abs(difference) <= (theoretical_value * 0.1) else "Incorrecto"
+        treeview.insert('', 'end', values=(material, measured_value, theoretical_range, difference, status))
 
 
 def Resolucion(head_params, dcm_files):
@@ -542,7 +556,9 @@ def Contraste(head_params, dcm_files):
         #objects_scharr = measure.regionprops(labeled_arr_scharr)
         
         ##descarto aquellos circulos que no me interesan a partir de la eccentricidad y ejes
-        circle_objects = [obj for obj in objects if obj['eccentricity']<0.7 and obj['axis_major_length']>12/tamPx and obj['axis_major_length']<110/tamPx]
+        circle_objects = [obj for obj in objects if obj.eccentricity < 0.7 and obj.major_axis_length > 12/tamPx and obj.major_axis_length < 110/tamPx]
+
+        #circle_objects = [obj for obj in objects if obj['eccentricity']<0.7 and obj['axis_major_length']>12/tamPx and obj['axis_major_length']<110/tamPx]
         #circle_objects_scharr = [obj for obj in objects_scharr if obj['centroid'][0] < 200 and obj['centroid'][1] < 300]
         fig, ax = plt.subplots(figsize=(10, 6))
         circle = {}
@@ -584,11 +600,12 @@ def Contraste(head_params, dcm_files):
             std = pixel_data_copy[rr,cc]
             
             label_image = measure.label(img)
-            props = measure.regionprops_table(label_image, pixel_data,
-                          properties=['image_intensity', 'intensity_mean'])
+            props = measure.regionprops_table(label_image, intensity_image=pixel_data,
+                      properties=['label', 'mean_intensity'])
+
                         
             #In HU units    
-            roi_value[i] = np.round(props['intensity_mean'][0]*Slope + Intercept,2)
+            roi_value[i] = np.round(props['mean_intensity'][0]*Slope + Intercept,2)
             std_value[i] = np.round(np.std(std),2)
             plt.text(b,a, str(i), color="red", fontsize=12)
             
@@ -777,8 +794,15 @@ def procesar_resolucion():
     create_xlsx(contraste, dcm_files)
 
 #6-2-2024
+    columns = ("lp/cm", "Contraste (%)", "Estado")
+    treeview['columns'] = columns
+    for col in columns:
+        treeview.heading(col, text=col)
+        treeview.column(col, anchor="center")
+
+
     update_treeview(treeview, contraste)
-    treeview.grid(row=7, column=0, columnspan=2, sticky='nsew')
+    #treeview.grid(row=6, column=0, columnspan=2, sticky='nsew')
 #6-2-2024
 
     # Imprimiremos los valores seleccionados
@@ -786,6 +810,12 @@ def procesar_resolucion():
 
 
 def procesar_contraste():
+    
+        # Limpia el área de mensajes y el Treeview si ya contiene datos
+    area_mensajes.delete('1.0', tk.END)
+    for i in treeview.get_children():
+        treeview.delete(i)
+        
     path = ruta_texto.get()
     anatomia = seleccion_anatomia.get()
     head_params = anatomia == 'Head'
@@ -820,7 +850,13 @@ def procesar_contraste():
     canvas.draw()
     canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
-
+    columns = ("Materiales", "HU", "HU teórico", "Diferencia HU", "Estado")
+    treeview['columns'] = columns
+    for col in columns:
+        treeview.heading(col, text=col)
+        treeview.column(col, anchor="center")
+        
+    update_treeview_contrast(treeview, roi_dict, std_dict, roi_settings)
 
 def seleccionar_carpeta():
     path = filedialog.askdirectory()
@@ -913,16 +949,12 @@ area_mensajes.grid(row=5, column=0, columnspan=2)
 
 # Contenedor para el gráfico
 grafico_frame = tk.Frame(app)
-grafico_frame.grid(row=6, column=0, columnspan=2)
+grafico_frame.grid(row=7, column=0, columnspan=2)
 
 #6-2-2024
 # Define el Treeview en GUI
-columns = ("lp/cm", "Contraste (%)", "Estado")
-treeview = ttk.Treeview(app, columns=columns, show='headings')
-for col in columns:
-    treeview.heading(col, text=col)
-    treeview.column(col, anchor="center")
-
+treeview = ttk.Treeview(app)
+treeview.grid(row=6, column=0, columnspan=2)
 #6-2-2024
 
 app.mainloop()
