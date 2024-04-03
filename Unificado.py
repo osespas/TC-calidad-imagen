@@ -40,7 +40,8 @@ from tkinter import filedialog
 from tkinter import ttk
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-
+import inspect
+from datetime import datetime
 
 
 #######################################
@@ -155,33 +156,26 @@ def create_xlsx(contrast_percentage, dcm_files):
     
     
         #6-2-2024
-def update_treeview(treeview, contrast_percentage):
+def update_treeview(treeview, data_to_export):
+    
+    global last_function_called
+    
     # Limpia el Treeview
     for i in treeview.get_children():
         treeview.delete(i)
     
     # Datos de ejemplo, reemplaza con los valores reales
-    lp_cm = range(len(contrast_percentage))
-    estados = ["Correcto" if val >= 10 else "Incorrecto" for val in contrast_percentage]
+    cols = range(len(data_to_export))
+    #estados = ["Correcto" if val >= 10 else "Incorrecto" for val in data_to_export]
     
-    # Inserta los datos en el Treeview
-    for i in lp_cm:
-        treeview.insert('', 'end', values=(i, contrast_percentage[i], estados[i]))
+    # Inserta los datos en el Treeview en funcion de la ultima funcion llamada
+    for i in cols:
+        if last_function_called == procesar_resolucion:
+            treeview.insert('', 'end', values=(i, data_to_export[i]))
+        elif last_function_called == procesar_contraste:
+            materials = ["Air", "PMP", "LDPE", "Poly", "Acrylic", "Delrin", "Teflon", "Fecha"]
+            treeview.insert('', 'end', values=(materials[i], data_to_export[i]))
         #6-2-2024
-        
-def update_treeview_contrast(treeview, roi_dict, std_dict, roi_settings):
-    # Limpia el Treeview
-    for i in treeview.get_children():
-        treeview.delete(i)
-    
-    # Inserta los nuevos datos en el Treeview
-    for material, values in roi_dict.items():
-        theoretical_range = roi_settings[material]['theo']
-        theoretical_value = roi_settings[material]['ref']
-        measured_value = roi_dict[material]
-        difference = measured_value - theoretical_value
-        status = "Correcto" if abs(difference) <= (theoretical_value * 0.1) else "Incorrecto"
-        treeview.insert('', 'end', values=(material, measured_value, theoretical_range, difference, status))
 
 
 def Resolucion(head_params, dcm_files):
@@ -556,9 +550,7 @@ def Contraste(head_params, dcm_files):
         #objects_scharr = measure.regionprops(labeled_arr_scharr)
         
         ##descarto aquellos circulos que no me interesan a partir de la eccentricidad y ejes
-        circle_objects = [obj for obj in objects if obj.eccentricity < 0.7 and obj.major_axis_length > 12/tamPx and obj.major_axis_length < 110/tamPx]
-
-        #circle_objects = [obj for obj in objects if obj['eccentricity']<0.7 and obj['axis_major_length']>12/tamPx and obj['axis_major_length']<110/tamPx]
+        circle_objects = [obj for obj in objects if obj['eccentricity']<0.7 and obj['axis_major_length']>12/tamPx and obj['axis_major_length']<110/tamPx]
         #circle_objects_scharr = [obj for obj in objects_scharr if obj['centroid'][0] < 200 and obj['centroid'][1] < 300]
         fig, ax = plt.subplots(figsize=(10, 6))
         circle = {}
@@ -600,12 +592,11 @@ def Contraste(head_params, dcm_files):
             std = pixel_data_copy[rr,cc]
             
             label_image = measure.label(img)
-            props = measure.regionprops_table(label_image, intensity_image=pixel_data,
-                      properties=['label', 'mean_intensity'])
-
+            props = measure.regionprops_table(label_image, pixel_data,
+                          properties=['image_intensity', 'intensity_mean'])
                         
             #In HU units    
-            roi_value[i] = np.round(props['mean_intensity'][0]*Slope + Intercept,2)
+            roi_value[i] = np.round(props['intensity_mean'][0]*Slope + Intercept,2)
             std_value[i] = np.round(np.std(std),2)
             plt.text(b,a, str(i), color="red", fontsize=12)
             
@@ -705,7 +696,7 @@ def create_xlsx2(roi_value, roi_settings, dcm_files):
         #hu_diff = hu_diff + [a-b for a,b in zip(hu_ref, hu_theo)]
 
         for i, val in enumerate(hu[1:]):
-            result = "Correcto" if val >= int(hu_lower[i]) and val <= int(hu_upper[i]) else "Incorrecto"    
+            result = "Correcto" if int(val) >= int(hu_lower[i]) and int(val) <= int(hu_upper[i]) else "Incorrecto"    
             # Set fill color based on the result
             if result == "Correcto":
                 fill = PatternFill(start_color="00FF00", end_color="00FF00", fill_type="solid")  # Green
@@ -755,6 +746,8 @@ def create_xlsx2(roi_value, roi_settings, dcm_files):
     
     wb.save("table_contraste.xlsx")
     
+    return hu[1:]
+    
     #######################################
 #
 #            Funciones para botones
@@ -763,12 +756,11 @@ def create_xlsx2(roi_value, roi_settings, dcm_files):
     
 
 def procesar_resolucion():
-    
-    # Limpia el área de mensajes y el Treeview si ya contiene datos
-    area_mensajes.delete('1.0', tk.END)
-    for i in treeview.get_children():
-        treeview.delete(i)
-        
+    # 01-04-24 exportar en funcion de la funcion que se ha llamado
+    global last_function_called, data_to_export
+    last_function_called = procesar_resolucion
+    # 01-04-24 exportar en funcion de la funcion que se ha llamado
+            
     path = ruta_texto.get()
     anatomia = seleccion_anatomia.get()
     head_params = anatomia == 'Head'
@@ -792,30 +784,44 @@ def procesar_resolucion():
     
     contraste = Resolucion(head_params, dcm_files)
     create_xlsx(contraste, dcm_files)
-
-#6-2-2024
-    columns = ("lp/cm", "Contraste (%)", "Estado")
-    treeview['columns'] = columns
+    
+    # Limpia el área de mensajes y el Treeview si ya contiene datos
+    area_mensajes.delete('1.0', tk.END)
+    #for i in treeview.get_children():
+    #    treeview.delete(i)
+    # Si ya existe un canvas, primero lo eliminas
+    for widget in grafico_frame.winfo_children():
+        widget.destroy()
+    
+    #6-2-2024
+    # Define el Treeview en GUI
+    columns = ("lp/cm", "Contraste (%)")
+    treeview = ttk.Treeview(app, columns=columns, show='headings')
     for col in columns:
         treeview.heading(col, text=col)
         treeview.column(col, anchor="center")
+    treeview.grid(row=7, column=0, columnspan=2, sticky='nsew')
+    #6-2-2024
+    
+    # 01-04-24 exportar a excel
+    data_to_export = contraste
+    # 01-04-24 exportar a excel
 
-
+    #6-2-2024
     update_treeview(treeview, contraste)
-    #treeview.grid(row=6, column=0, columnspan=2, sticky='nsew')
-#6-2-2024
+    #6-2-2024
 
     # Imprimiremos los valores seleccionados
     area_mensajes.insert(tk.END, f"Procesando imágenes en {path} para {anatomia}\n")
 
 
 def procesar_contraste():
+    # 01-04-24 exportar en funcion de la funcion que se ha llamado
+    global last_function_called, data_to_export
+    last_function_called = procesar_contraste
+    # 01-04-24
     
-        # Limpia el área de mensajes y el Treeview si ya contiene datos
-    area_mensajes.delete('1.0', tk.END)
-    for i in treeview.get_children():
-        treeview.delete(i)
-        
+    
     path = ruta_texto.get()
     anatomia = seleccion_anatomia.get()
     head_params = anatomia == 'Head'
@@ -840,7 +846,12 @@ def procesar_contraste():
 
     roi_dict, std_dict, roi_settings = Contraste(head_params, dcm_files)
     fig = plot_linearity(roi_dict, std_dict, roi_settings)
-    create_xlsx2(roi_dict, roi_settings, dcm_files)
+    hu = create_xlsx2(roi_dict, roi_settings, dcm_files)
+    
+    # Limpia el área de mensajes y el Treeview si ya contiene datos
+    area_mensajes.delete('1.0', tk.END)
+    #for i in treeview_hu.get_children():
+    #    treeview_hu.delete(i)
 
     # Si ya existe un canvas, primero lo eliminas
     for widget in grafico_frame.winfo_children():
@@ -849,14 +860,28 @@ def procesar_contraste():
     canvas = FigureCanvasTkAgg(fig, master=grafico_frame)
     canvas.draw()
     canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-
-    columns = ("Materiales", "HU", "HU teórico", "Diferencia HU", "Estado")
-    treeview['columns'] = columns
-    for col in columns:
-        treeview.heading(col, text=col)
-        treeview.column(col, anchor="center")
+    canvas.get_tk_widget().config(width=600, height=500)
         
-    update_treeview_contrast(treeview, roi_dict, std_dict, roi_settings)
+        
+    #03-04-2024
+    # Define el Treeview en GUI
+    columns_hu = ("Materiales", "HU")
+    treeview_hu = ttk.Treeview(app, columns=columns_hu, show='headings')
+    for col in columns_hu:
+        treeview_hu.heading(col, text=col)
+        treeview_hu.column(col, anchor="center")
+    treeview_hu.grid(row=7, column=0, columnspan=2, sticky='nsew')
+    #03-04-2024
+    
+    # 01-04-24 exportar a excel
+    data_to_export = hu
+    # 01-04-24 exportar a excel
+    update_treeview(treeview_hu, hu)
+    # Imprimiremos los valores seleccionados
+    area_mensajes.insert(tk.END, f"Procesando imágenes en {path} para {anatomia}\n")
+
+
+
 
 def seleccionar_carpeta():
     path = filedialog.askdirectory()
@@ -864,61 +889,82 @@ def seleccionar_carpeta():
 
 
 def exportar_a_excel():
-    #De momento solo lo hace con la resolucion y de forma muy burda, porque repite todo el analisis.
-    #Necesitamos pensar como hacer esto mejor
+
     path = ruta_texto.get()
     anatomia = seleccion_anatomia.get()
     head_params = anatomia == 'Head'
-    
- 
-    
-    os.chdir(path)
-    dcm_files = []
-    
-    
-    for file_name in os.listdir(path):
+
+    # 01-04-24 exportar en funcion de la funcion que se ha llamado
+    global last_function_called, data_to_export
+    if last_function_called is None:
+        print("No function has been called yet.")
+        return
+
+    # Prepare data based on the last function called
+    if last_function_called == procesar_resolucion:
+        print("Data from procesar_resolucion")
+        if data_to_export[0] != "Contraste (%)":
+            data_to_export.insert(0, "Contraste (%)")
+        current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        data_to_export.append(current_date)
+        lpcm = ["lp/cm", 0, 1 , 2, 3, 4, 5, 6, 7, 8, "Fecha"]
+        print(data_to_export)
         try:
-            if file_name.endswith(".DCM"):
-                dcm_files.append(os.path.join(path, file_name))
-                print(' INFO **MAIN()** CARGANDO IMAGEN: ', file_name)
-            elif file_name.endswith(".dcm"):
-                dcm_files.append(os.path.join(path, file_name))
-                print(' INFO **MAIN()** CARGANDO IMAGEN: ', file_name)
-        except:
-                pass
+            wb = load_workbook("historico_resolucion.xlsx")
+        except FileNotFoundError:
+            wb = Workbook()
+
+        ws = wb.active       
+        row = 1    
+        for i, value in enumerate(lpcm, start=1):
+            ws.cell(row=row, column=i, value=value)
+
+        # Encontrar la primera fila vacía en la columna A
+        row = 2
+        while ws.cell(row=row, column=1).value is not None: 
+            row += 1
+        for i, value in enumerate(data_to_export, start=1):
+            ws.cell(row=row, column=i, value=value)
+        wb.save("historico_resolucion.xlsx")
         
-    ##########################
-    
-    contraste = Resolucion(head_params, dcm_files)
-    contraste.insert(0, "Contraste (%)")
-    lpcm = ["lp/cm", 0, 1 , 2, 3, 4, 5, 6, 7, 8]
-    try:
-        wb = load_workbook("historico.xlsx")
-    except FileNotFoundError:
-        wb = Workbook()
+    elif last_function_called == procesar_contraste:
+        print("Data from procesar_contraste")
+        
+        if data_to_export[0] != "HU":
+            data_to_export.insert(0, "HU")
+        current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        data_to_export.append(current_date)
+        materials = ["Materiales", "Air", "PMP", "LDPE", "Poly", "Acrylic", "Delrin", "Teflon", "Fecha"]
+        print(data_to_export)
+        try:
+            wb = load_workbook("historico_contraste.xlsx")
+        except FileNotFoundError:
+            wb = Workbook()
 
-    ws = wb.active
-   
-    
-    row = 1    
-    for i, value in enumerate(lpcm, start=1):
-        ws.cell(row=row, column=i, value=value)
+        ws = wb.active       
+        row = 1    
+        for i, value in enumerate(materials, start=1):
+            ws.cell(row=row, column=i, value=value)
 
-    # Encontrar la primera fila vacía en la columna A
-    row = 2
-    while ws.cell(row=row, column=1).value is not None:
-        row += 1
+        # Encontrar la primera fila vacía en la columna A
+        row = 2
+        while ws.cell(row=row, column=1).value is not None: 
+            row += 1
+        for i, value in enumerate(data_to_export, start=1):
+            ws.cell(row=row, column=i, value=value)
+        wb.save("historico_contraste.xlsx")
+        
 
-    for i, value in enumerate(contraste, start=1):
-        ws.cell(row=row, column=i, value=value)
+    else:
+        print("Waiting for data")
+    # 01-04-24 exportar en funcion de la funcion que se ha llamado
 
-    wb.save("historico.xlsx")
-         
-    
 #####################################################################            
 ######################APP GUI #######################################
 #####################################################################
-           
+
+global last_function_called
+
 app = tk.Tk()
 app.title("Procesador de Imágenes DICOM")
 
@@ -937,11 +983,11 @@ tk.Radiobutton(app, text="Torax", variable=seleccion_anatomia, value='Torax').gr
 # Botón para procesar imágenes para Resolución
 tk.Button(app, text="Procesar Resolución", command=procesar_resolucion).grid(row=4, column=0)
 
-#Botón para exportar a Excel histórico
-tk.Button(app, text="Exportar", command=exportar_a_excel).grid(row=4, column=3)
-
 # Botón para procesar imágenes para Contraste
 tk.Button(app, text="Procesar Contraste", command=procesar_contraste).grid(row=4, column=1)
+
+#Botón para exportar a Excel histórico
+tk.Button(app, text="Exportar", command=exportar_a_excel).grid(row=4, column=3)
 
 # Área de Mensajes
 area_mensajes = tk.Text(app, height=10, width=100)
@@ -949,13 +995,8 @@ area_mensajes.grid(row=5, column=0, columnspan=2)
 
 # Contenedor para el gráfico
 grafico_frame = tk.Frame(app)
-grafico_frame.grid(row=7, column=0, columnspan=2)
+grafico_frame.grid(row=6, column=0, columnspan=2)
 
-#6-2-2024
-# Define el Treeview en GUI
-treeview = ttk.Treeview(app)
-treeview.grid(row=6, column=0, columnspan=2)
-#6-2-2024
 
 app.mainloop()
         
